@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hidden Eraser Game</title>
+<style>
+  html,body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#0d1b2a; font-family:'Segoe UI',Arial,sans-serif; }
+  #stage-wrap { width:100vw; height:100vh; display:flex; align-items:center; justify-content:center; }
+  #stage {
+    position:relative; width:1280px; height:720px; transform-origin:center center;
+    background: radial-gradient(circle at 50% 50%, #6fa8dc 0%, #4f87b8 23%, #3f6f96 78%, #274c6e 100%);
+    border-radius:18px; box-shadow:0 0 0 14px #cfe2f3, 0 0 40px rgba(0,0,0,0.6); overflow:hidden;
+  }
+  .boy-img { position:absolute; }
+  #boy-full { left:229.3px; top:66.9px; width:439.7px; height:603.6px; z-index:2; }
+  #boy-portrait { left:690.9px; top:74.2px; width:574.8px; height:568.4px; z-index:2; }
+  #indicators { position:absolute; left:504.6px; top:62.1px; width:732.6px; height:599.7px; pointer-events:none; transition:opacity 0.3s ease; z-index:3; }
+  #indicators.hidden { opacity:0; }
+
+  .hotspot { position:absolute; cursor:pointer; z-index:4; }
+
+  .eraser-img {
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+    z-index:3;
+    transform-style: preserve-3d;
+    perspective: 400px;
+  }
+  #eraser-shoulder { z-index:1; }
+  #eraser-shoulder.above { z-index:3; }
+
+  @keyframes riseIn {
+    from { opacity:0; transform:translateY(40px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  @keyframes spinFade {
+    0%   { opacity:0; transform:rotateY(0deg) scale(0.7); }
+    100% { opacity:1; transform:rotateY(1080deg) scale(1); }
+  }
+  @keyframes zoomOut {
+    from { opacity:0; transform:scale(0.05); }
+    to   { opacity:1; transform:scale(1); }
+  }
+  @keyframes zoomSpin {
+    0%   { opacity:0; transform:scale(0.05) rotateY(0deg); }
+    100% { opacity:1; transform:scale(1) rotateY(1080deg); }
+  }
+  @keyframes slinkFromEar {
+    0%   { opacity:0; transform:translateX(40px); clip-path: inset(0 100% 0 0); }
+    100% { opacity:1; transform:translateX(0); clip-path: inset(0 0% 0 0); }
+  }
+
+  .eraser-img.show.anim-rise   { animation: riseIn 0.6s cubic-bezier(.2,.9,.3,1.2) forwards; }
+  .eraser-img.show.anim-spinfade { animation: spinFade 0.9s ease-out forwards; }
+  .eraser-img.show.anim-zoom   { animation: zoomOut 0.5s cubic-bezier(.2,.9,.3,1.2) forwards; }
+  .eraser-img.show.anim-zoomspin { animation: zoomSpin 0.9s cubic-bezier(.2,.9,.3,1.2) forwards; }
+  .eraser-img.show.anim-slink  { animation: slinkFromEar 0.6s ease-out forwards; }
+
+  #legend-panel {
+    position:absolute; left:38.1px; top:106.6px; width:300px; height:495.4px;
+    background:#ffffff; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,0.45);
+    opacity:0; pointer-events:none; transform:scale(0.9); transition:opacity 0.35s ease, transform 0.35s ease;
+    z-index:5;
+  }
+  #legend-panel.visible { opacity:1; pointer-events:auto; transform:scale(1); }
+
+  .legend-btn { position:absolute; padding:0; border:3px solid transparent; border-radius:10px; background:transparent; cursor:pointer; overflow:hidden; }
+  .legend-btn img { width:100%; height:100%; display:block; }
+  .legend-btn.correct-flash { border-color:#2ecc71; animation:flashGreen 0.6s; }
+  .legend-btn.wrong-flash { border-color:#e74c3c; animation:shake 0.4s; }
+  @keyframes flashGreen { 0%,100%{background:transparent;} 40%{background:#d4f7dc;} }
+  @keyframes shake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-8px);} 40%{transform:translateX(8px);} 60%{transform:translateX(-6px);} 80%{transform:translateX(6px);} }
+
+  #prompt-banner { position:absolute; left:0; top:14px; width:100%; text-align:center; color:#fff; font-size:22px; font-weight:600; text-shadow:0 2px 4px rgba(0,0,0,0.5); pointer-events:none; z-index:6; }
+  #reset-btn { position:absolute; right:20px; bottom:16px; padding:8px 18px; border-radius:20px; border:none; background:#ffffffdd; color:#274c6e; font-weight:700; cursor:pointer; box-shadow:0 3px 8px rgba(0,0,0,0.3); font-size:14px; z-index:6; }
+  #reset-btn:hover { background:#fff; }
+</style>
+</head>
+<body>
+<div id="stage-wrap">
+  <div id="stage">
+    <div id="prompt-banner">Tap a marker to choose a body part!</div>
+    <img class="boy-img" id="boy-full" src="./assets/boy_full.png" alt="full body doll">
+    <img class="boy-img" id="boy-portrait" src="./assets/boy_portrait.png" alt="portrait doll">
+    <img id="indicators" src="./assets/indicators.png" alt="indicators">
+
+    <div class="hotspot" data-part="head" style="left:552.5px;top:70.1px;width:156.2px;height:103.8px;"></div>
+    <div class="hotspot" data-part="shoulder" style="left:529.3px;top:208.9px;width:138.4px;height:87.2px;"></div>
+    <div class="hotspot" data-part="knee" style="left:518.3px;top:450.7px;width:162.9px;height:82.3px;"></div>
+    <div class="hotspot" data-part="toe" style="left:570.4px;top:562.7px;width:117.9px;height:74.6px;"></div>
+    <div class="hotspot" data-part="ear" style="left:678.5px;top:276.3px;width:138.9px;height:68.3px;"></div>
+    <div class="hotspot" data-part="mouth" style="left:768.5px;top:401.9px;width:180.5px;height:77.5px;"></div>
+    <div class="hotspot" data-part="eye" style="left:1066.3px;top:233.1px;width:164.1px;height:97.6px;"></div>
+    <div class="hotspot" data-part="nose" style="left:1020.0px;top:396.1px;width:234.6px;height:85.2px;"></div>
+
+    <img class="eraser-img anim-rise" id="eraser-head" src="./assets/eraser.png" style="left:427.9px;top:80.7px;width:56.2px;height:34.0px;">
+    <img class="eraser-img anim-rise" id="eraser-shoulder" src="./assets/eraser.png" style="left:468.0px;top:272.2px;width:56.2px;height:34.0px;">
+    <img class="eraser-img anim-spinfade" id="eraser-knee" src="./assets/eraser.png" style="left:463.4px;top:551.0px;width:56.2px;height:34.0px;">
+    <img class="eraser-img anim-zoom" id="eraser-toe" src="./assets/eraser.png" style="left:500.2px;top:625.6px;width:56.2px;height:34.0px;">
+    <img class="eraser-img anim-zoomspin" id="eraser-eye" src="./assets/eraser.png" style="left:1014.6px;top:315.1px;width:56.2px;height:34.0px;">
+    <img class="eraser-img anim-slink" id="eraser-ear" src="./assets/eraser.png" style="left:779.6px;top:317.3px;width:56.2px;height:34.0px;">
+    <img class="eraser-img anim-zoom" id="eraser-mouth" src="./assets/eraser.png" style="left:950.2px;top:386.6px;width:56.2px;height:34.0px;">
+    <img class="eraser-img anim-zoom" id="eraser-nose" src="./assets/eraser.png" style="left:946.6px;top:336.2px;width:56.2px;height:34.0px;">
+
+    <div id="legend-panel">
+      <button class="legend-btn" data-part="head" style="left:4.6px;top:9.3px;width:132.3px;height:99.4px;"><img src="./assets/head.png" alt="head"></button>
+      <button class="legend-btn" data-part="shoulder" style="left:161.1px;top:10.6px;width:132.3px;height:99.4px;"><img src="./assets/shoulder.png" alt="shoulder"></button>
+      <button class="legend-btn" data-part="knee" style="left:2.3px;top:135.2px;width:132.3px;height:99.4px;"><img src="./assets/knee.png" alt="knee"></button>
+      <button class="legend-btn" data-part="toe" style="left:158.8px;top:136.6px;width:132.3px;height:99.4px;"><img src="./assets/toe.png" alt="toe"></button>
+      <button class="legend-btn" data-part="eye" style="left:4.5px;top:263.1px;width:132.3px;height:99.4px;"><img src="./assets/eye.png" alt="eye"></button>
+      <button class="legend-btn" data-part="ear" style="left:160.9px;top:264.5px;width:132.3px;height:99.4px;"><img src="./assets/ear.png" alt="ear"></button>
+      <button class="legend-btn" data-part="mouth" style="left:4.4px;top:391.1px;width:132.3px;height:99.4px;"><img src="./assets/mouth.png" alt="mouth"></button>
+      <button class="legend-btn" data-part="nose" style="left:160.9px;top:392.5px;width:132.3px;height:99.4px;"><img src="./assets/nose.png" alt="nose"></button>
+    </div>
+
+    <button id="reset-btn">Reset</button>
+  </div>
+</div>
+
+<audio id="sound-gong" src="./assets/gong.wav"></audio>
+<audio id="sound-buzz" src="./assets/buzz.wav"></audio>
+
+<script>
+const stage = document.getElementById('stage');
+function fitStage() {
+  const scale = Math.min(window.innerWidth/1280, window.innerHeight/720);
+  stage.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', fitStage);
+fitStage();
+
+const banner = document.getElementById('prompt-banner');
+const legendPanel = document.getElementById('legend-panel');
+const indicators = document.getElementById('indicators');
+const gong = document.getElementById('sound-gong');
+const buzz = document.getElementById('sound-buzz');
+let selectedPart = null;
+let solved = false;
+
+document.querySelectorAll('.hotspot').forEach(h => {
+  h.addEventListener('click', () => {
+    if (solved) return;
+    selectedPart = h.dataset.part;
+    document.querySelectorAll('.hotspot').forEach(x => x.style.display = 'none');
+    indicators.classList.add('hidden');
+    legendPanel.classList.add('visible');
+    banner.textContent = "Now guess: which word matches?";
+  });
+});
+
+document.querySelectorAll('.legend-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (!selectedPart || solved) return;
+    if (btn.dataset.part === selectedPart) {
+      solved = true;
+      btn.classList.add('correct-flash');
+      gong.currentTime = 0; gong.play();
+      const eraser = document.getElementById('eraser-' + selectedPart);
+      eraser.classList.add('show');
+      if (selectedPart === 'shoulder') {
+        eraser.addEventListener('animationend', () => eraser.classList.add('above'), { once:true });
+      }
+      banner.textContent = "Correct! That's the " + selectedPart + ".";
+    } else {
+      btn.classList.remove('wrong-flash');
+      void btn.offsetWidth;
+      btn.classList.add('wrong-flash');
+      buzz.currentTime = 0; buzz.play();
+    }
+  });
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  selectedPart = null; solved = false;
+  document.querySelectorAll('.hotspot').forEach(x => x.style.display = 'block');
+  indicators.classList.remove('hidden');
+  legendPanel.classList.remove('visible');
+  document.querySelectorAll('.eraser-img').forEach(e => e.classList.remove('show','above'));
+  document.querySelectorAll('.legend-btn').forEach(b => b.classList.remove('correct-flash','wrong-flash'));
+  banner.textContent = "Tap a marker to choose a body part!";
+});
+</script>
+</body>
+</html>
